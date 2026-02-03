@@ -2,6 +2,8 @@
 
 A ViolentMonkey/Tampermonkey userscript that adds bulk emoji upload functionality to Slack's emoji customization page.
 
+![Bulk Emoji Upload Modal](screenshot.png)
+
 ## Features
 
 - **Bulk upload** - Select multiple emoji images at once via drag & drop or file browser
