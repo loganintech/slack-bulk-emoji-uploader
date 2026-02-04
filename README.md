@@ -7,6 +7,8 @@ A ViolentMonkey/Tampermonkey userscript that adds bulk emoji upload functionalit
 ## Features
 
 - **Bulk upload** - Select multiple emoji images at once via drag & drop or file browser
+- **Drag from browser** - Drag images directly from other browser windows/tabs
+- **Clipboard paste** - Paste images directly from your clipboard (Ctrl/Cmd+V)
 - **Rename before upload** - Edit emoji names before confirming, with live validation
 - **Auto-sanitization** - File names are automatically converted to valid Slack emoji format
 - **Visual progress** - See upload status for each emoji (pending, uploading, success, error)
@@ -39,7 +41,9 @@ A ViolentMonkey/Tampermonkey userscript that adds bulk emoji upload functionalit
 3. Click to open the bulk upload modal
 
 4. Add emoji images:
-   - Drag & drop images onto the dropzone, or
+   - Drag & drop images from your file system
+   - Drag images directly from other browser windows
+   - Paste images from your clipboard (Ctrl/Cmd+V)
    - Click "browse files" to select multiple images
 
 5. Review and edit emoji names as needed:
@@ -68,6 +72,10 @@ The script automatically sanitizes filenames to meet these requirements.
 
 **Upload fails with "error_name_taken"**
 - An emoji with that name already exists; rename it and try again
+
+**"Could not fetch image" when dragging from browser**
+- Some websites block external access to their images (CORS)
+- Try saving the image locally first, then drag from your file system
 
 ## License
 

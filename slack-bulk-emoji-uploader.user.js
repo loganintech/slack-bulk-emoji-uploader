@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Slack Bulk Emoji Uploader
 // @namespace    https://slack.com/
-// @version      1.0.0
+// @version      1.2.0
 // @description  Bulk upload emojis to Slack with rename support
 // @author       You
 // @match        https://*.slack.com/customize/emoji*
@@ -267,6 +267,53 @@
         return /^[a-z0-9][a-z0-9_-]*[a-z0-9]$|^[a-z0-9]$/.test(name) && name.length >= 1 && name.length <= 100;
     }
 
+    // Extract image URL from dataTransfer (for images dragged from other browser windows)
+    function extractImageUrl(dataTransfer) {
+        // Try to get URL directly
+        const url = dataTransfer.getData('text/uri-list') || dataTransfer.getData('text/plain');
+        if (url && /^https?:\/\/.+\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url)) {
+            return url;
+        }
+
+        // Try to extract from HTML (img src)
+        const html = dataTransfer.getData('text/html');
+        if (html) {
+            const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+
+        return null;
+    }
+
+    // Extract filename from URL
+    function getFilenameFromUrl(url) {
+        try {
+            const pathname = new URL(url).pathname;
+            const filename = pathname.split('/').pop();
+            return filename || 'image';
+        } catch {
+            return 'image';
+        }
+    }
+
+    // Fetch image from URL and convert to File
+    async function fetchImageAsFile(url) {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) {
+            throw new Error('URL did not return an image');
+        }
+
+        const filename = getFilenameFromUrl(url);
+        return new File([blob], filename, { type: blob.type });
+    }
+
     // Upload a single emoji
     async function uploadEmoji(emoji) {
         const token = getApiToken();
@@ -305,7 +352,7 @@
                 </div>
                 <div class="bulk-emoji-dropzone">
                     <div class="bulk-emoji-dropzone-text">
-                        Drag & drop emoji images here, or <span class="bulk-emoji-browse">browse files</span>
+                        Drag & drop emoji images here, paste from clipboard, or <span class="bulk-emoji-browse">browse files</span>
                     </div>
                     <input type="file" multiple accept="image/*" style="display: none;" />
                 </div>
@@ -341,11 +388,60 @@
         dropzone.addEventListener('dragleave', () => {
             dropzone.classList.remove('dragover');
         });
-        dropzone.addEventListener('drop', (e) => {
+        dropzone.addEventListener('drop', async (e) => {
             e.preventDefault();
             dropzone.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
+
+            // First try to handle as files (from file system)
+            if (e.dataTransfer.files.length > 0) {
+                handleFiles(e.dataTransfer.files);
+                return;
+            }
+
+            // Try to handle as URL (from other browser windows)
+            const imageUrl = extractImageUrl(e.dataTransfer);
+            if (imageUrl) {
+                dropzone.querySelector('.bulk-emoji-dropzone-text').textContent = 'Fetching image...';
+                try {
+                    const file = await fetchImageAsFile(imageUrl);
+                    handleFiles([file]);
+                } catch (err) {
+                    console.error('Failed to fetch image from URL:', err);
+                    alert('Could not fetch image. The source may block external access (CORS).');
+                }
+                dropzone.querySelector('.bulk-emoji-dropzone-text').innerHTML =
+                    'Drag & drop emoji images here, paste from clipboard, or <span class="bulk-emoji-browse">browse files</span>';
+                dropzone.querySelector('.bulk-emoji-browse').addEventListener('click', () => fileInput.click());
+            }
         });
+
+        // Clipboard paste support
+        overlay.addEventListener('paste', async (e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+
+            const imageFiles = [];
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        // Generate a name since clipboard images don't have filenames
+                        const ext = item.type.split('/')[1] || 'png';
+                        const namedFile = new File([file], `pasted_image_${Date.now()}.${ext}`, { type: file.type });
+                        imageFiles.push(namedFile);
+                    }
+                }
+            }
+
+            if (imageFiles.length > 0) {
+                e.preventDefault();
+                handleFiles(imageFiles);
+            }
+        });
+
+        // Make overlay focusable to receive paste events
+        overlay.setAttribute('tabindex', '-1');
+        overlay.focus();
 
         // Close modal
         function closeModal() {
