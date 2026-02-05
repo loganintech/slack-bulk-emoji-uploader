@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Slack Bulk Emoji Uploader
 // @namespace    https://slack.com/
-// @version      1.2.0
+// @version      1.2.1
 // @description  Bulk upload emojis to Slack with rename support
 // @author       You
 // @match        https://*.slack.com/customize/emoji*
@@ -215,6 +215,25 @@
             cursor: pointer;
             text-decoration: underline;
         }
+        .bulk-emoji-toast {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #e01e5a;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            max-width: 80%;
+            text-align: center;
+        }
+        .bulk-emoji-toast.visible {
+            opacity: 1;
+        }
     `;
 
     // Inject styles
@@ -364,8 +383,21 @@
                         <button class="bulk-emoji-btn bulk-emoji-btn-primary bulk-emoji-upload" disabled>Upload All</button>
                     </div>
                 </div>
+                <div class="bulk-emoji-toast"></div>
             </div>
         `;
+
+        const toastEl = overlay.querySelector('.bulk-emoji-toast');
+        let toastTimeout = null;
+
+        function showToast(message, duration = 4000) {
+            toastEl.textContent = message;
+            toastEl.classList.add('visible');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastEl.classList.remove('visible');
+            }, duration);
+        }
 
         const dropzone = overlay.querySelector('.bulk-emoji-dropzone');
         const fileInput = overlay.querySelector('input[type="file"]');
@@ -407,7 +439,7 @@
                     handleFiles([file]);
                 } catch (err) {
                     console.error('Failed to fetch image from URL:', err);
-                    alert('Could not fetch image. The source may block external access (CORS).');
+                    showToast('Could not fetch image. The source may block external access (CORS).');
                 }
                 dropzone.querySelector('.bulk-emoji-dropzone-text').innerHTML =
                     'Drag & drop emoji images here, paste from clipboard, or <span class="bulk-emoji-browse">browse files</span>';
